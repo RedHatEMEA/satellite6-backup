@@ -10,8 +10,9 @@
 # CONSTANTS
 #
 BDIR=/backup       # The Backup Dir
-SNAPSHOT_PV=
-PULP_LV=
+PULP_LV=root
+PULP_VG=vg0
+FULL_PATH_LV=/dev/$PULP_VG/$PULP_LV
 
 #
 # Set a return code to 0, any errors will set this to 1.
@@ -119,10 +120,10 @@ sat6_repo_backup() {
     fi
 
     # Create snapshot of logical volume containing pulp repos.
-    if ! lvcreate ${PULP_LV} \
+    if ! lvcreate --size 500m  \
                   --snapshot \
                   --name snap_$(basename ${PULP_LV}) \
-                  --extents 100%PVS ${SNAPSHOT_PV}
+                  ${FULL_PATH_LV}
       then
         RET_CODE=1
         $LOG_CMD "ERROR: Failed to create snapshot of LVM volume ${PULP_LV}"
