@@ -26,7 +26,7 @@ RET_CODE=0
 TAR_CMD=$(which tar)
 RSYNC_CMD=$(which rsync)
 RUNUSER_CMD=$(which runuser)
-PG_CMD=$(which postgres)
+POSTGRES_USER=postgres
 MONGODUMP_CMD=$(which mongodump)
 LOGGER_CMD=$(which logger)
 LOG_CMD="${LOGGER_CMD} -t SAT6BACKUP"
@@ -164,12 +164,12 @@ sat6_mongo_backup() {
 # Backup the PostgreSQL Database
 #
 sat6_postgresql_backup() {
-    $LOG_CMD "Backing up Satellite 6 - PostgreSQL - foremanschema"
-    $RUNUSER_CMD - $POSTGRES_CMD -c \
-       "pg_dump -Fc foremanschema > ${BDIR}/foreman.dump"
+    $LOG_CMD "Backing up Satellite 6 - PostgreSQL - foreman"
+    $RUNUSER_CMD - $POSTGRES_USER -c \
+       "pg_dump foreman > ${BDIR}/foreman.dump"
     $LOG_CMD "Backing up Satellite 6 - PostgreSQL - candlepin"
-    $RUNUSER_CMD - $POSTGRES_CMD -c \
-       "pg_dump -Fc candlepin > ${BDIR}/candlepin.dump"
+    $RUNUSER_CMD - $POSTGRES_USER -c \
+       "pg_dump candlepin > ${BDIR}/candlepin.dump"
 }
 
 prepare_backup_dir
