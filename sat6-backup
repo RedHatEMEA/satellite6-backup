@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash 
 ##############################################################################
 # Script to perform backup of Satellite 6.
 #
@@ -10,8 +10,10 @@
 # CONSTANTS
 #
 BDIR=/backup       # The Backup Dir
-PULP_LV=root
-PULP_VG=vg0
+#The name of the logical volume /var/lib/pulp resides on
+PULP_LV=
+#The name of the volume group /var/lib/pulp resides on
+PULP_VG=
 FULL_PATH_LV=/dev/$PULP_VG/$PULP_LV
 
 #
