@@ -1,0 +1,182 @@
+#!/bin/bash
+##############################################################################
+# Script to perform backup of Satellite 6.
+#
+# Author: Harald Jensås <hjensas@redhat.com>
+#
+##############################################################################
+
+#
+# CONSTANTS
+#
+BDIR=/backup       # The Backup Dir
+SNAPSHOT_PV=
+PULP_LV=
+
+#
+# Set a return code to 0, any errors will set this to 1.
+# Exit the script with the return code, to indicate success ot not.
+#
+RET_CODE=0
+
+
+#
+# Find some binaries...
+#
+TAR_CMD=$(which tar)
+RSYNC_CMD=$(which rsync)
+RUNUSER_CMD=$(which runuser)
+PG_CMD=$(which postgres)
+MONGODUMP_CMD=$(which mongodump)
+LOGGER_CMD=$(which logger)
+LOG_CMD="${LOGGER_CMD} -t SAT6BACKUP"
+
+
+prepare_backup_dir() {
+    chgrp postgres $BDIR
+    chmod 770 $BDIR
+}
+
+#############################################
+# Backup the Satellite 6 Configuration files.
+#
+sat6_config_backup() {
+   $LOG_CMD "Backing up Satellite 6 - Configuration...."
+   if ! $TAR_CMD --selinux -czvf \
+       ${BDIR}/config_files.tar.gz \
+       /etc/katello \
+       /etc/elasticsearch \
+       /etc/candlepin \
+       /etc/pulp \
+       /etc/gofer \
+       /etc/grinder \
+       /etc/pki/katello \
+       /etc/pki/pulp \
+       /etc/qpidd.conf \
+       /etc/sysconfig/katello \
+       /etc/sysconfig/elasticsearch \
+       /root/ssl-build \
+       /var/www/html/pub
+      then
+         RET_CODE=1
+         $LOG_CMD "ERROR: Failed to backup Satellite 6 - Configuration"
+      else
+         $LOG_CMD "Successfully  backed up Satellite 6 - Configuration"
+    fi
+    $LOG_CMD "Backing up Satellite 6 - Elasticsearch data...."
+    if ! $TAR_CMD --selinux -czvf \
+       ${BDIR}/elastic_data.tar.gz \
+       /var/lib/elasticsearch
+      then
+       RET_CODE=1
+       $LOG_CMD "ERROR: Failed to backup Satellite 6 - Elasticsearch data"
+      else
+       $LOG_CMD "Successfully  backed up Satellite 6 - Elasticsearch data"
+    fi
+
+    return $RET_CODE
+}
+
+##############################
+# Backup the Pulp Repositories
+#	
+sat6_repo_backup() {
+    $LOG_CMD "Backing up Satellite 6 - Pulp Repositories..."
+
+    # We need to stop pulp before doing the backup, for consistency.
+    if ! katello-service stop
+      then
+        RET_CODE=1
+        $LOG_CMD "ERROR: stopping katello-service failed"
+        $LOG_CMD "ERROR: Failed to backup Satellite 6 - Pulp Repositories"
+        return $RET_CODE
+      else
+        $LOG_CMD "Successfully stopped ketello-service before Pulp Repo Snapshot"
+    fi
+
+    # If a snapshot of the logical volume containint pulp repos
+    # already exist, remove it.
+    local snap_pulp_lv=$(dirname ${PULP_LV})/snap_$(basename ${PULP_LV})
+    echo $snap_pulp_lv
+    if [ -b $snap_pulp_lv ]
+      then
+        if umount $snap_pulp_lv
+          then
+            $LOG_CMD "Successfully umount LVM snapshot $snap_pulp_lv"
+          else
+            $LOG_CMD "Assuming LVM snapshot $snap_pulp_lv is not mounted"
+        fi
+
+        if ! lvremove -f $snap_pulp_lv
+          then
+            RET_CODE=1
+            $LOG_CMD "ERROR: Failed to remove LVM Snapshot $snap_pulp_lv"
+            $LOG_CMD "ERROR: Failed to backup Satellite 6 - Pulp Repositories"
+            return $RET_CODE
+          else
+            $LOG_CMD "Successfully removed LVM snapshot $snap_pulp_lv"
+        fi
+    fi
+
+    # Create snapshot of logical volume containing pulp repos.
+    if ! lvcreate ${PULP_LV} \
+                  --snapshot \
+                  --name snap_$(basename ${PULP_LV}) \
+                  --extents 100%PVS ${SNAPSHOT_PV}
+      then
+        RET_CODE=1
+        $LOG_CMD "ERROR: Failed to create snapshot of LVM volume ${PULP_LV}"
+        $LOG_CMD "ERROR: Failed to backup Satellite 6 - Pulp Repositories"
+        return $RET_CODE
+      else
+        $LOG_CMD "Successfully created snapshot of LVM volume ${PULP_LV}"
+    fi
+
+    # Mount the Snapshot   
+    mkdir -p ${BDIR}/var/lib/pulp
+    mount $snap_pulp_lv ${BDIR}/var
+
+    ### NOTE : Backup ${BDIR}/var/lib/pulp/ only with external tool...
+    #          Ideally /var/lib/pulp/ wold be it's own LVM volume...   
+
+    # Start the katello-servic again after backup complete
+    if ! katello-service start
+      then
+        RET_CODE=1
+        $LOG_CMD "ERROR: Starting katello-service failed"
+        return $RET_CODE
+      else
+        $LOG_CMD "Successfully started ketello-service after Pulp Repo Snapshot"
+    fi
+
+    return $RET_CODE
+}
+
+#############################
+# Backup the MongoDB Database
+#
+sat6_mongo_backup() {
+    $LOG_CMD "Backing up Satellite 6 - MongoDB database..."
+    $MONGODUMP_CMD --host localhost --out ${BDIR}/mongo_dump
+}
+
+################################
+# Backup the PostgreSQL Database
+#
+sat6_postgresql_backup() {
+    $LOG_CMD "Backing up Satellite 6 - PostgreSQL - foremanschema"
+    $RUNUSER_CMD - $POSTGRES_CMD -c \
+       "pg_dump -Fc foremanschema > ${BDIR}/foreman.dump"
+    $LOG_CMD "Backing up Satellite 6 - PostgreSQL - candlepin"
+    $RUNUSER_CMD - $POSTGRES_CMD -c \
+       "pg_dump -Fc candlepin > ${BDIR}/candlepin.dump"
+}
+
+prepare_backup_dir
+sat6_config_backup
+sat6_postgresql_backup
+sat6_mongo_backup
+sat6_repo_backup
+
+exit $RET_CODE
+
