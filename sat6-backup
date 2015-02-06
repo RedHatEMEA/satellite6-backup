@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 ##############################################################################
 # Script to perform backup of Satellite 6.
 #
@@ -97,7 +97,7 @@ sat6_repo_backup() {
 
     # If a snapshot of the logical volume containint pulp repos
     # already exist, remove it.
-    local snap_pulp_lv=$(dirname ${PULP_LV})/snap_$(basename ${PULP_LV})
+    local snap_pulp_lv=/dev/$PULP_VG/snap_$(basename ${PULP_LV})
     echo $snap_pulp_lv
     if [ -b $snap_pulp_lv ]
       then
@@ -135,7 +135,7 @@ sat6_repo_backup() {
 
     # Mount the Snapshot   
     mkdir -p ${BDIR}/var/lib/pulp
-    mount $snap_pulp_lv ${BDIR}/var
+    mount -o nouuid $snap_pulp_lv ${BDIR}/var
 
     ### NOTE : Backup ${BDIR}/var/lib/pulp/ only with external tool...
     #          Ideally /var/lib/pulp/ wold be it's own LVM volume...   
