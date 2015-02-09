@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash 
 ##############################################################################
 # Script to perform backup of Satellite 6.
 #
@@ -10,8 +10,11 @@
 # CONSTANTS
 #
 BDIR=/backup       # The Backup Dir
-SNAPSHOT_PV=
+#The name of the logical volume /var/lib/pulp resides on
 PULP_LV=
+#The name of the volume group /var/lib/pulp resides on
+PULP_VG=
+FULL_PATH_LV=/dev/$PULP_VG/$PULP_LV
 
 #
 # Set a return code to 0, any errors will set this to 1.
@@ -96,7 +99,7 @@ sat6_repo_backup() {
 
     # If a snapshot of the logical volume containint pulp repos
     # already exist, remove it.
-    local snap_pulp_lv=$(dirname ${PULP_LV})/snap_$(basename ${PULP_LV})
+    local snap_pulp_lv=/dev/$PULP_VG/snap_$(basename ${PULP_LV})
     echo $snap_pulp_lv
     if [ -b $snap_pulp_lv ]
       then
@@ -119,10 +122,10 @@ sat6_repo_backup() {
     fi
 
     # Create snapshot of logical volume containing pulp repos.
-    if ! lvcreate ${PULP_LV} \
+    if ! lvcreate --size 500m  \
                   --snapshot \
                   --name snap_$(basename ${PULP_LV}) \
-                  --extents 100%PVS ${SNAPSHOT_PV}
+                  ${FULL_PATH_LV}
       then
         RET_CODE=1
         $LOG_CMD "ERROR: Failed to create snapshot of LVM volume ${PULP_LV}"
@@ -134,7 +137,7 @@ sat6_repo_backup() {
 
     # Mount the Snapshot   
     mkdir -p ${BDIR}/var/lib/pulp
-    mount $snap_pulp_lv ${BDIR}/var
+    mount -o nouuid $snap_pulp_lv ${BDIR}/var
 
     ### NOTE : Backup ${BDIR}/var/lib/pulp/ only with external tool...
     #          Ideally /var/lib/pulp/ wold be it's own LVM volume...   
