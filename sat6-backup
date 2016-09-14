@@ -47,34 +47,38 @@ sat6_config_backup() {
    $LOG_CMD "Backing up Satellite 6 - Configuration...."
    if ! $TAR_CMD --selinux -czvf \
        ${BDIR}/config_files.tar.gz \
-       /etc/katello \
-       /etc/elasticsearch \
        /etc/candlepin \
-       /etc/pulp \
-       /etc/gofer \
-       /etc/grinder \
+       /etc/foreman \
+       /etc/foreman-installer \
+       /etc/foreman-proxy \
+       /etc/gutterball \
+       /etc/hammer \
+       /etc/httpd \
+       /etc/pki/content \
        /etc/pki/katello \
+       /etc/katello-certs-tools \
        /etc/pki/pulp \
-       /etc/qpidd.conf \
-       /etc/sysconfig/katello \
-       /etc/sysconfig/elasticsearch \
+       /etc/pki/tls/certs/katello-node.crt \
+       /etc/pki/tls/certs/pulp_consumers_ca.crt \
+       /etc/pki/tls/certs/pulp_ssl_cert.crt \
+       /etc/pki/tls/private/katello-node.key \
+       /etc/pulp \
+       /etc/puppet \
+       /etc/qpid \
+       /etc/qpid-dispatch \
+       /etc/sysconfig/tomcat* \
+       /etc/tomcat* \
        /root/ssl-build \
+       /var/lib/foreman \
+       /var/lib/candlepin \
+       /var/lib/puppet/foreman_cache_data \
+       /var/lib/puppet/ssl \
        /var/www/html/pub
       then
          RET_CODE=1
          $LOG_CMD "ERROR: Failed to backup Satellite 6 - Configuration"
       else
          $LOG_CMD "Successfully  backed up Satellite 6 - Configuration"
-    fi
-    $LOG_CMD "Backing up Satellite 6 - Elasticsearch data...."
-    if ! $TAR_CMD --selinux -czvf \
-       ${BDIR}/elastic_data.tar.gz \
-       /var/lib/elasticsearch
-      then
-       RET_CODE=1
-       $LOG_CMD "ERROR: Failed to backup Satellite 6 - Elasticsearch data"
-      else
-       $LOG_CMD "Successfully  backed up Satellite 6 - Elasticsearch data"
     fi
 
     return $RET_CODE
